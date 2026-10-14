@@ -7,6 +7,10 @@
 
 English TL;DR: a self-hosted home-bar inventory + cocktail matcher in one static page and one JSON file. No database, no build chain, no cloud. Ships with an optional MCP server so your AI agent (Claude Code / any MCP client) can read and update your bar directly.
 
+| 酒柜清单 | 能调什么 |
+|:---:|:---:|
+| ![inventory](docs/inventory.jpg) | ![recipes](docs/recipes.jpg) |
+
 ---
 
 ## 它回答的唯一问题
