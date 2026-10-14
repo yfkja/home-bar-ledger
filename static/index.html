@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🍸 Home Bar Ledger 家庭酒柜</title>
+<style>
+  :root { --bg:#0f1117; --panel:#161b22; --line:#21262d; --txt:#e6edf3; --sub:#8b949e; --accent:#d29922; --blue:#58a6ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; padding:20px; max-width:1440px; margin:0 auto; }
+  h1 { font-size:22px; margin-bottom:4px; }
+  .sub { color:var(--sub); font-size:12px; margin-bottom:16px; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .toolbar input { flex:1; min-width:200px; background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:8px 12px; font-size:14px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .chip { background:var(--panel); border:1px solid var(--line); color:var(--sub); border-radius:14px; padding:4px 12px; font-size:12px; cursor:pointer; user-select:none; }
+  .chip.on { background:#3d2d0a; border-color:var(--accent); color:var(--accent); }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { background:var(--panel); border:1px solid var(--line); color:var(--sub); border-radius:8px; padding:8px 18px; font-size:14px; cursor:pointer; }
+  .tab.on { background:#1f2937; border-color:var(--blue); color:var(--blue); font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card .nm { font-size:15px; font-weight:600; margin-bottom:2px; }
+  .card .br { color:var(--sub); font-size:12px; margin-bottom:8px; }
+  .badge { display:inline-block; border-radius:4px; padding:1px 8px; font-size:11px; margin-right:5px; margin-bottom:5px; }
+  .b-type { background:#1f2937; color:var(--blue); }
+  .b-abv { background:#3d2d0a; color:var(--accent); }
+  .b-stock { background:#0f2d1a; color:#3fb950; }
+  .b-todo { background:#2d1416; color:#f85149; }
+  .card .fl { font-size:12px; color:var(--sub); margin:4px 0; }
+  .card .meta { font-size:12px; color:var(--sub); }
+  .tagrow { margin-top:6px; }
+  .tag { display:inline-block; background:#12261e; color:#56d364; border-radius:3px; font-size:10px; padding:1px 6px; margin:0 4px 4px 0; }
+  .recipe { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .recipe .rn { font-size:15px; font-weight:600; margin-bottom:6px; }
+  .recipe .row { font-size:12.5px; color:var(--sub); margin:3px 0; }
+  .recipe .row b { color:var(--txt); font-weight:500; }
+  .ok { color:#3fb950; } .lack { color:#f85149; }
+  .lv { float:right; font-size:11px; border-radius:10px; padding:1px 8px; }
+  .lv0 { background:#0f2d1a; color:#3fb950; } .lv1 { background:#1f2937; color:var(--blue); } .lv2 { background:#2d2410; color:var(--accent); }
+  .stat { display:flex; gap:14px; margin:14px 0 18px; flex-wrap:wrap; }
+  .stat .box { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 18px; text-align:center; }
+  .stat .n { font-size:22px; font-weight:700; color:var(--accent); }
+  .stat .l { font-size:11px; color:var(--sub); }
+  .empty { color:var(--sub); padding:30px; text-align:center; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<h1>🍸 家庭酒柜</h1>
+<div class="sub">台账更新：<span id="updated">—</span> · 数据源 bar_data.json · 调酒配方按库存自动判定「能调 / 缺料」</div>
+
+<div class="stat" id="stat"></div>
+
+<div class="toolbar">
+  <input id="q" placeholder="搜索：品名 / 品牌 / 风味 / 调法（如 金酒、青桔、马天尼）· 配方标签加 #（如 #经典、#零门槛）" oninput="render()">
+</div>
+<div class="chips" id="chips"></div>
+
+<div class="tabs">
+  <div class="tab on" id="tab-bar" onclick="setTab('bar')">🍾 酒柜清单</div>
+  <div class="tab" id="tab-rec" onclick="setTab('rec')">🧪 能调什么（<span id="recn">0</span>）</div>
+  <div class="tab" id="tab-mix" onclick="setTab('mix')">🛒 辅料采购（<span id="mixn">0</span>）</div>
+</div>
+
+<div id="view-bar" class="grid"></div>
+<div id="view-rec" class="grid hidden"></div>
+<div id="view-mix" class="hidden"></div>
+
+<script>
+let DATA={items:[],recipes:[],base_drinks:[],mixers:[],shopping:{}}, CAT='全部', TAB='bar';
+const CATS=['全部','烈酒·基酒','利口酒·苦酒·威末','果酒·低度','白酒','葡萄酒','啤酒'];
+
+function catOf(it){
+  if(it.cat) return it.cat;
+  const t=(it.type||'')+(it.name||'');
+  if(/预调|RTD/.test(t)) return '果酒·低度';
+  if(/白酒/.test(t)) return '白酒';
+  if(/葡萄酒|干红/.test(t)) return '葡萄酒';
+  if(/啤酒/.test(t)) return '啤酒';
+  if(/果酒|气泡酒/.test(t)) return '果酒·低度';
+  if(/利口|苦酒|威末/.test(t)) return '利口酒·苦酒·威末';
+  return '烈酒·基酒';
+}
+
+async function load(){
+  DATA=await (await fetch('/api/data?ts='+Date.now())).json();
+  document.getElementById('updated').textContent=DATA.updated||'—';
+  render();
+}
+
+function setTab(t){
+  TAB=t;
+  ['bar','rec','mix'].forEach(x=>{
+    document.getElementById('tab-'+x).classList.toggle('on',x===t);
+    document.getElementById('view-'+x).classList.toggle('hidden',x!==t);
+  });
+  render();
+}
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function matchItem(it,q){
+  if(!q) return true;
+  return ((it.name||'')+(it.brand||'')+(it.type||'')+(it.flavor||'')+(it.note||'')+(it.tags||[]).join('')).toLowerCase().includes(q);
+}
+
+function mixerStock(name){
+  const ms=(DATA.mixers||[]).concat(DATA.base_drinks||[]);
+  const hit=ms.find(m=>name.indexOf(m.name)>=0 || m.name.indexOf(name)>=0);
+  return hit? hit.stock : null;
+}
+function recipeOK(r){
+  const have=(DATA.items||[]).filter(i=>String(i.stock).indexOf('在架')===0).map(i=>i.name);
+  const spiritOK=(r.spirits||[]).length===0?true:r.spirits.every(s=>have.some(h=>h===s || h.indexOf(s)>=0 || s.indexOf(h)>=0));
+  const missing=(r.need||[]).filter(n=>n.indexOf('待购')>=0 && mixerStock(n)!=='家里有');
+  return {spiritOK, missing, can: spiritOK && missing.length===0};
+}
+
+function renderMix(){
+  const ms=DATA.mixers||[], sh=DATA.shopping||{};
+  let html='<div style="grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:4px;">'
+    +'<div class="row" style="font-size:13px;color:var(--sub);margin:4px 0;">🧺 <b style="color:var(--txt)">极简套装</b>：'+esc(sh.minimal||'')+'</div>'
+    +'<div class="row" style="font-size:13px;color:var(--sub);margin:4px 0;">🧺 <b style="color:var(--txt)">完整套装</b>：'+esc(sh.full||'')+'</div>'
+    +'<div class="row" style="font-size:13px;color:var(--sub);margin:4px 0;">📐 <b style="color:var(--txt)">工具</b>：'+esc(sh.tools||'')+'</div>'
+    +'<div class="row" style="font-size:13px;color:var(--sub);margin:4px 0;">🍸 <b style="color:var(--txt)">要不要加酒</b>：'+esc(sh.liquor_advice||'')+'</div></div>';
+  html+=ms.map(m=>{
+    const has=m.stock==='家里有';
+    return `<div class="card">
+      <div class="nm">${esc(m.name)} <span class="badge ${has?'b-stock':'b-abv'}">${has?'✅ 家里有':'🛒 待购'}</span></div>
+      <div class="br">${esc(m.need)} · ${esc(m.buy)}</div>
+      <div class="fl">🎯 ${esc(m.use)}</div>
+      <div class="meta">🤝 搭配：${esc(m.pairing)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('view-mix').innerHTML=html;
+}
+
+function render(){
+  const q=(document.getElementById('q').value||'').trim().toLowerCase();
+
+  const c=document.getElementById('chips');
+  c.innerHTML=CATS.map(x=>`<span class="chip ${x===CAT?'on':''}" onclick="CAT='${x}';render()">${x}</span>`).join('');
+
+  const items=DATA.items||[];
+  const strong=items.filter(i=>/烈酒|利口/.test(catOf(i))).length;
+  const low=items.filter(i=>/低度/.test(catOf(i))).length;
+  const recs=(DATA.recipes||[]);
+  const recsOK=recs.filter(r=>recipeOK(r).can).length;
+  document.getElementById('stat').innerHTML=
+    `<div class="box"><div class="n">${items.length}</div><div class="l">在架品种</div></div>`+
+    `<div class="box"><div class="n">${strong}</div><div class="l">烈酒/利口（可调）</div></div>`+
+    `<div class="box"><div class="n">${low}</div><div class="l">低度即饮</div></div>`+
+    `<div class="box"><div class="n">${recsOK}</div><div class="l">现在就能调</div></div>`;
+  document.getElementById('recn').textContent=recs.filter(r=>recipeOK(r).spiritOK).length;
+  document.getElementById('mixn').textContent=(DATA.mixers||[]).filter(m=>m.stock==='待购').length;
+
+  if(TAB==='mix'){ renderMix(); return; }
+  if(TAB==='bar'){
+    const list=items.filter(i=>matchItem(i,q)&&(CAT==='全部'||catOf(i)===CAT));
+    document.getElementById('view-bar').innerHTML=list.length?list.map(it=>{
+      const cv=catOf(it);
+      return `<div class="card">
+        <div class="nm">${esc(it.name)}</div>
+        <div class="br">${esc(it.brand)}</div>
+        <span class="badge b-type">${esc(cv)}</span>
+        ${it.abv?`<span class="badge b-abv">${it.abv}% vol</span>`:(/软饮|果汁|兑饮基底/.test(cv+it.type+it.name)?'<span class="badge b-type">0% vol · 非酒精</span>':'<span class="badge b-todo">度数待补</span>')}
+        <span class="badge b-stock">${esc(it.qty||'在架')}</span>
+        ${(/待确认/.test(it.size+'')||/待确认|待补/.test(it.note+''))?'<span class="badge b-todo">信息待补</span>':''}
+        <div class="fl">👅 ${esc(it.flavor)}</div>
+        <div class="meta">📍 ${esc(it.loc||'待补')} · ${esc(it.size||'')}</div>
+        <div class="tagrow">${(it.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+      </div>`;
+    }).join(''):'<div class="empty">没有匹配的酒 🫥</div>';
+  } else {
+    // 防御性渲染：任何一条配方字段缺失只跳该条并提示，不再让整页白屏（早期版本 r.level.indexOf 会崩全站）
+    const list=[];
+    for(const r of recs){
+      try{
+        const k=recipeOK(r);
+        const spiritsOk=(r.spirits||[]).length===0?true:r.spirits.some(s=>items.some(i=>(i.name||'').indexOf(s)>=0||s.indexOf(i.name||'')>=0));
+        if(!(k.spiritOK||spiritsOk)) continue;
+        const level=r.level||'未分级';
+        const hay={name:r.name,tags:[level],flavor:r.style||'',note:(r.spirits||[]).join('')+(r.need||[]).join('')+(r.verdict||'')};
+        if(q.startsWith('#')){ if(!level.toLowerCase().includes(q.slice(1))) continue; }
+        else if(!matchItem(hay,q)) continue;
+        list.push({r,k,level});
+      }catch(e){ console.warn('跳过坏配方条目', r && r.name, e); }
+    }
+    let head='';
+    if(DATA.storage_notes) head='<div style="grid-column:1/-1;background:#2d2410;border:1px solid #5e4a12;border-radius:10px;padding:12px;font-size:12.5px;color:#d29922;">🧊 开瓶保存：'+esc(DATA.storage_notes)+'</div>';
+    const bases=(DATA.base_drinks||[]).length?'<div style="grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;color:var(--sub);">🥤 兑饮基底：'+DATA.base_drinks.map(b=>esc(b.name)+'（'+esc(b.storage)+'）').join(' · ')+'</div>':'';
+    document.getElementById('view-rec').innerHTML=head+bases+(list.length?list.map(({r,k,level})=>{
+      const lv=/零门槛|零酒精/.test(level)?'lv0':(/简单|推荐/.test(level)?'lv1':'lv2');
+      return `<div class="recipe">
+        <span class="lv ${lv}">${esc(level)}</span>
+        <div class="rn">${esc(r.name)} ${k.can?'<span class="ok">✅ 现在就能调</span>':(k.spiritOK?'<span class="lack">🛒 缺料</span>':'<span class="lack">🍾 缺基酒</span>')}</div>
+        <div class="row"><b>基酒：</b>${(r.spirits||[]).length?r.spirits.map(s=>`<span class="ok">${esc(s)}</span>`).join(' + '):'<span class="ok">无酒精</span>'}</div>
+        <div class="row"><b>辅料：</b>${(r.need||[]).map(n=>n.indexOf('待购')>=0?(mixerStock(n)==='家里有'?esc(n.replace('（待购）',''))+' <span class="ok">(家里有)</span>':`<span class="lack">${esc(n)}</span>`):esc(n)).join(' + ')}</div>
+        <div class="row"><b>配方：</b>${esc(r.ratio)}</div>
+        <div class="row"><b>风格：</b>${esc(r.style)}</div>
+        ${r.verdict?'<div class="row" style="color:#8b949e;border-top:1px dashed var(--line);padding-top:4px;margin-top:4px;">'+(r.verdict.indexOf('✅')===0?'<span class="ok">👨‍🍳 '+esc(r.verdict)+'</span>':'<span style="color:#d29922;">👨‍🍳 '+esc(r.verdict)+'</span>')+'</div>':''}
+      </div>`;
+    }).join(''):'<div class="empty">没有匹配配方</div>');
+  }
+}
+load();
+</script>
+</body>
+</html>
