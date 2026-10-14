@@ -75,15 +75,16 @@ python3 serve.py --lan              # 需要手机在局域网打开时显式加
 
 ## 与同类项目的差异（诚实版）
 
-| | bar-assistant (1.1k★) | EverShelf | HomeStock (MCP) | 本项目 |
-|:---|:---|:---|:---|:---|
-| 安装 | Docker + PHP + Meilisearch | Docker + HA 生态 | uv + SQLite | **python3 serve.py** |
-| 配方来源 | 内置 500+ 通用配方 | — | — | **你自己的柜子和你自己攒的配方** |
-| 数据形态 | PostgreSQL | 后端库 | SQLite | **单 JSON 文件，可进 git** |
-| AI 接入 | 无 | HA 语音 | MCP 全功能 | AGENTS.md + 极简 MCP 双通道 |
-| 手机能用 | 要配反代 | 要配反代 | — | 局域网直接开 |
+| | [bar-assistant](https://github.com/karlomikus/bar-assistant) (1k+★) | [EverShelf](https://github.com/dadaloop82/EverShelf) | 本项目 |
+|:---|:---|:---|:---|
+| 定位 | 家庭酒吧全套系统 | 食品柜管理（pantry） | 酒柜台账 |
+| 安装 | Docker + PHP + Meilisearch | Docker + HA 生态 | **python3 serve.py** |
+| 配方来源 | 内置通用配方库 | 非鸡尾酒向 | **你自己的柜子和你自己攒的配方** |
+| 数据形态 | PostgreSQL | 后端数据库 | **单 JSON 文件，可进 git** |
+| AI 接入 | 无 | HA 语音 | AGENTS.md + 极简 MCP 双通道 |
+| 手机能用 | 要配反代 | 要配反代 | 局域网直接开 |
 
-它内置 500 条配方；我们只有你柜里那几瓶对应的答案。这是刻意的取舍：**库存是台账，不是数据库**。
+要功能全、生态成熟的方案？bar-assistant 星标上千、一直在维护，直接用它。本项目赌的是另一个问题：**你的柜子里有什么，只有你自己的 agent 知道**。库存是台账，不是数据库。
 
 ## Evidence & Limits
 
